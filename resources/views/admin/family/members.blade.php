@@ -98,45 +98,21 @@
                 <h5 class="card-title">Family Members</h5>
             </div>
             <div class="card-body">
-                @if($familyMembers->isEmpty())
-                    <div class="alert alert-info text-center">
-                        No family members found. Add your first family member!
-                    </div>
-                @else
-                    <table class="table table-bordered" id="familyMembersTable">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Name</th>
-                                <th>Gender</th>
-                                <th>Date of Birth</th>
-                                <th>Age</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($familyMembers as $member)
-                                <tr id="member-row-{{ $member->id }}">
-                                    <td>{{ $loop->iteration }}</td>
-                                    <td>{{ $member->first_name }} {{ $member->last_name }}</td>
-                                    <td>{{ ucfirst($member->gender) }}</td>
-                                    <td>{{ \Carbon\Carbon::parse($member->dob)->format('M d, Y') }}</td>
-                                    <td>{{ \Carbon\Carbon::parse($member->dob)->age }} years</td>
-                                    <td>
-                                        <button class="btn btn-info btn-sm manage-relationships-btn" 
-                                                data-id="{{ $member->id }}" 
-                                                data-name="{{ $member->first_name }} {{ $member->last_name }}">
-                                            Manage Relationships
-                                        </button>
-                                        <button class="btn btn-info btn-sm manage-events-btn" data-id="{{ $member->id }}" data-name="{{ $member->first_name }} {{ $member->last_name }}">Manage Events</button>
-                                        <button class="btn btn-warning btn-sm edit-btn" data-id="{{ $member->id }}">Edit</button>
-                                        <button class="btn btn-danger btn-sm delete-btn" data-id="{{ $member->id }}">Delete</button>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                @endif
+                <table class="table table-bordered table-striped" id="familyMembersTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Gender</th>
+                            <th>Date of Birth</th>
+                            <th>Age</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- DataTables will populate this automatically -->
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -193,7 +169,6 @@
     </div>
 </div>
 
-
 <div class="modal fade" id="manageRelationshipsModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -212,9 +187,7 @@
                         <label for="node2_id">Select Family Member</label>
                         <select name="node2_id" id="node2_id" class="form-control">
                             <option value="">Choose Member</option>
-                            @foreach ($familyMembers as $member)
-                                <option value="{{ $member->id }}">{{ $member->first_name }} {{ $member->last_name }}</option>
-                            @endforeach
+                            <!-- Options will be loaded dynamically -->
                         </select>
                         <div class="invalid-feedback" id="node2_id_error"></div>
                     </div>
@@ -258,8 +231,69 @@
 <!-- Required JS Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-beta.1/dist/js/select2.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.25/js/dataTables.bootstrap4.min.js"></script>
 <script>
     $(document).ready(function() {
+        // Initialize DataTable
+        // Initialize DataTable
+        // Initialize DataTable
+var dataTable = $('#familyMembersTable').DataTable({
+    processing: true,
+    serverSide: true,
+    ajax: {
+        url: '{{ route("admin.family.members.data") }}',
+        type: 'GET'
+    },
+    columns: [
+        { 
+            data: 'DT_RowIndex',
+            name: 'DT_RowIndex',
+            orderable: false,
+            searchable: false
+        },
+        { 
+            data: 'full_name',
+            name: 'first_name',
+            orderable: true,
+            searchable: true
+        },
+        { 
+            data: 'gender_formatted',
+            name: 'gender',
+            orderable: true,
+            searchable: true
+        },
+        { 
+            data: 'dob_formatted',
+            name: 'dob', // This tells DataTables to use the 'dob' database column for sorting
+            orderable: true,
+            searchable: true
+        },
+        { 
+            data: 'age',
+            name: 'dob', // Age also uses dob column for searching
+            orderable: false,
+            searchable: true
+        },
+        { 
+            data: 'actions',
+            name: 'actions',
+            orderable: false,
+            searchable: false
+        }
+    ],
+    order: [[3, 'asc']], // Default sort by DOB column (index 3) ascending
+    language: {
+        emptyTable: "No family members found. Add your first family member!",
+        processing: '<i class="fas fa-spinner fa-spin"></i> Loading...'
+    },
+    drawCallback: function() {
+        // Re-initialize event handlers if needed
+        $('[data-toggle="tooltip"]').tooltip();
+    }
+});
+
         // Enable Select2 on dropdowns
         $('#gender').select2({
             placeholder: "Select Gender",
@@ -381,286 +415,209 @@
 
         // Handle form submit for both add and edit
         $('#familyMemberForm').submit(function(e) {
-    e.preventDefault();
+            e.preventDefault();
 
-    // Validate form
-    if (!validateForm()) {
-        return;
-    }
-
-    // Determine if we're adding or updating
-    const method = $('#form_method').val();
-    const memberId = $('#member_id').val();
-    let url, successMessage;
-
-    if (method === 'PUT') {
-        // Properly construct the update URL with the id parameter
-        url = '{{ route("admin.family.update", ["id" => ":id"]) }}'.replace(':id', memberId);
-        successMessage = 'Family member updated successfully!';
-    } else {
-        url = '{{ route("admin.family.store") }}';
-        successMessage = 'Family member added successfully!';
-    }
-
-    // Show loading state
-    const submitBtn = $('#submitBtn');
-    const originalText = submitBtn.html();
-    submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Processing...');
-
-    // Prepare form data
-    const formData = $(this).serialize();
-
-    // AJAX request
-    $.ajax({
-        url: url,
-        method: method === 'PUT' ? 'PUT' : 'POST',
-        data: formData,
-        success: function(response) {
-            // Show success message
-            Swal.fire({
-                icon: 'success',
-                title: 'Success!',
-                text: successMessage,
-                timer: 2000,
-                showConfirmButton: false
-            });
-
-            // Calculate age
-            const dob = new Date(response.dob);
-            const today = new Date();
-            let age = today.getFullYear() - dob.getFullYear();
-            const monthDiff = today.getMonth() - dob.getMonth();
-            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-                age--;
+            // Validate form
+            if (!validateForm()) {
+                return;
             }
 
-            // Format date for display
-            const formattedDob = new Date(response.dob).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-            });
+            // Determine if we're adding or updating
+            const method = $('#form_method').val();
+            const memberId = $('#member_id').val();
+            let url, successMessage;
 
             if (method === 'PUT') {
-                // Update existing row
-                $(`#member-row-${response.id}`).html(`
-                    <td>${$(`#member-row-${response.id}`).find('td:first').text()}</td>
-                    <td>${response.first_name} ${response.last_name}</td>
-                    <td>${response.gender.charAt(0).toUpperCase() + response.gender.slice(1)}</td>
-                    <td>${formattedDob}</td>
-                    <td>${age} years</td>
-                    <td>
-                        <button class="btn btn-warning btn-sm edit-btn" data-id="${response.id}">Edit</button>
-                        <button class="btn btn-danger btn-sm delete-btn" data-id="${response.id}">Delete</button>
-                    </td>
-                `);
+                // Properly construct the update URL with the id parameter
+                url = '{{ route("admin.family.update", ["id" => ":id"]) }}'.replace(':id', memberId);
+                successMessage = 'Family member updated successfully!';
             } else {
-                // Append new row
-                let newMember = `
-                    <tr id="member-row-${response.id}">
-                        <td>${$('#familyMembersTable tbody tr').length + 1}</td>
-                        <td>${response.first_name} ${response.last_name}</td>
-                        <td>${response.gender.charAt(0).toUpperCase() + response.gender.slice(1)}</td>
-                        <td>${formattedDob}</td>
-                        <td>${age} years</td>
-                        <td>
-                            <button class="btn btn-warning btn-sm edit-btn" data-id="${response.id}">Edit</button>
-                            <button class="btn btn-danger btn-sm delete-btn" data-id="${response.id}">Delete</button>
-                        </td>
-                    </tr>
-                `;
-                
-                // If table doesn't exist (empty state), create it
-                if ($('#familyMembersTable').length === 0) {
-                    $('.card-body .alert').remove();
-                    $('.card-body').html(`
-                        <table class="table table-bordered" id="familyMembersTable">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Name</th>
-                                    <th>Gender</th>
-                                    <th>Date of Birth</th>
-                                    <th>Age</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${newMember}
-                            </tbody>
-                        </table>
-                    `);
-                } else {
-                    $('#familyMembersTable tbody').append(newMember);
-                }
+                url = '{{ route("admin.family.store") }}';
+                successMessage = 'Family member added successfully!';
             }
 
-            // Reset form
-            resetForm();
-            
-            // Reset button state
-            submitBtn.prop('disabled', false).html(originalText);
-        },
-        error: function(xhr) {
-            // Reset button state
-            submitBtn.prop('disabled', false).html(originalText);
-            
-            if (xhr.status === 422) {
-                // Validation errors
-                const errors = xhr.responseJSON.errors;
-                $.each(errors, function(key, value) {
-                    const fieldId = key === 'dob' ? 'dob_day' : key;
-                    $(`#${fieldId}`).addClass('is-invalid');
-                    $(`#${fieldId}_error`).text(value[0]);
-                });
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Validation Error!',
-                    text: 'Please check the form for errors.',
-                });
-            } else {
-                // Other errors
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error!',
-                    text: xhr.responseJSON?.message || 'An error occurred while processing the request.',
-                });
-            }
-        }
-    });
-});
+            // Show loading state
+            const submitBtn = $('#submitBtn');
+            const originalText = submitBtn.html();
+            submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Processing...');
 
-// Edit family member
-$(document).on('click', '.edit-btn', function() {
-    const memberId = $(this).data('id');
-    
-    // Show loading
-    Swal.fire({
-        title: 'Loading...',
-        text: 'Fetching member details',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
+            // Prepare form data
+            const formData = $(this).serialize();
 
-    // Properly construct the show URL with the id parameter
-    const showUrl = '{{ route("admin.family.show", ["id" => ":id"]) }}'.replace(':id', memberId);
-    
-    // Fetch member details
-    $.ajax({
-        url: showUrl,
-        method: 'GET',
-        success: function(response) {
-            Swal.close();
-            
-            // Populate form with member data
-            $('#member_id').val(response.id);
-            $('#first_name').val(response.first_name);
-            $('#last_name').val(response.last_name);
-            $('#gender').val(response.gender).trigger('change');
-            
-            // Parse and set date components
-            const dob = new Date(response.dob);
-            const day = dob.getDate().toString().padStart(2, '0');
-            const month = (dob.getMonth() + 1).toString().padStart(2, '0');
-            const year = dob.getFullYear();
-            
-            $('#dob_day').val(day).trigger('change');
-            $('#dob_month').val(month).trigger('change');
-            $('#dob_year').val(year).trigger('change');
-            
-            // Update form for edit mode
-            $('#form_method').val('PUT');
-            $('#formTitle').text('Edit Family Member');
-            $('#submitBtn').text('Update Member').removeClass('btn-success').addClass('btn-primary');
-            $('#cancelEditBtn').show();
-            
-            // Scroll to form
-            $('html, body').animate({
-                scrollTop: $('#familyMemberForm').offset().top - 100
-            }, 500);
-        },
-        error: function() {
-            Swal.fire({
-                icon: 'error',
-                title: 'Error!',
-                text: 'Failed to fetch member details.'
-            });
-        }
-    });
-});
-
-// Delete family member
-$(document).on('click', '.delete-btn', function() {
-    const memberId = $(this).data('id');
-    const memberName = $(this).closest('tr').find('td:nth-child(2)').text();
-    
-    Swal.fire({
-        title: 'Are you sure?',
-        text: `You are about to delete ${memberName}. This action cannot be undone!`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Yes, delete it!'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            // If we're editing this member, reset the form first
-            if ($('#member_id').val() == memberId) {
-                resetForm();
-            }
-            
-            // Properly construct the destroy URL with the id parameter
-            const deleteUrl = '{{ route("admin.family.destroy", ["id" => ":id"]) }}'.replace(':id', memberId);
-            
+            // AJAX request
             $.ajax({
-                url: deleteUrl,
-                method: 'DELETE',
-                data: {
-                    _token: '{{ csrf_token() }}',
-                    _method: 'DELETE'
-                },
+                url: url,
+                method: method === 'PUT' ? 'PUT' : 'POST',
+                data: formData,
                 success: function(response) {
+                    // Show success message
                     Swal.fire({
                         icon: 'success',
-                        title: 'Deleted!',
-                        text: 'Family member has been deleted.',
+                        title: 'Success!',
+                        text: successMessage,
                         timer: 2000,
                         showConfirmButton: false
                     });
+
+                    // Refresh DataTable to show updated data
+                    dataTable.ajax.reload(null, false);
+
+                    // Reset form
+                    resetForm();
                     
-                    // Remove row from table
-                    $(`#member-row-${memberId}`).remove();
-                    
-                    // Update row numbers
-                    $('#familyMembersTable tbody tr').each(function(index) {
-                        $(this).find('td:first').text(index + 1);
-                    });
-                    
-                    // If no more rows, show empty state
-                    if ($('#familyMembersTable tbody tr').length === 0) {
-                        $('#familyMembersTable').remove();
-                        $('.card-body').html(`
-                            <div class="alert alert-info text-center">
-                                No family members found. Add your first family member!
-                            </div>
-                        `);
-                    }
+                    // Reset button state
+                    submitBtn.prop('disabled', false).html(originalText);
                 },
                 error: function(xhr) {
+                    // Reset button state
+                    submitBtn.prop('disabled', false).html(originalText);
+                    
+                    if (xhr.status === 422) {
+                        // Validation errors
+                        const errors = xhr.responseJSON.errors;
+                        $.each(errors, function(key, value) {
+                            const fieldId = key === 'dob' ? 'dob_day' : key;
+                            $(`#${fieldId}`).addClass('is-invalid');
+                            $(`#${fieldId}_error`).text(value[0]);
+                        });
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Validation Error!',
+                            text: 'Please check the form for errors.',
+                        });
+                    } else {
+                        // Other errors
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error!',
+                            text: xhr.responseJSON?.message || 'An error occurred while processing the request.',
+                        });
+                    }
+                }
+            });
+        });
+
+        // Cancel edit
+        $('#cancelEditBtn').click(function() {
+            resetForm();
+        });
+
+        // Edit family member - using event delegation for dynamically loaded buttons
+        $(document).on('click', '.edit-btn', function() {
+            const memberId = $(this).data('id');
+            
+            // Show loading
+            Swal.fire({
+                title: 'Loading...',
+                text: 'Fetching member details',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            // Properly construct the show URL with the id parameter
+            const showUrl = '{{ route("admin.family.show", ["id" => ":id"]) }}'.replace(':id', memberId);
+            
+            // Fetch member details
+            $.ajax({
+                url: showUrl,
+                method: 'GET',
+                success: function(response) {
+                    Swal.close();
+                    
+                    // Populate form with member data
+                    $('#member_id').val(response.id);
+                    $('#first_name').val(response.first_name);
+                    $('#last_name').val(response.last_name);
+                    $('#gender').val(response.gender).trigger('change');
+                    
+                    // Parse and set date components
+                    const dob = new Date(response.dob);
+                    const day = dob.getDate().toString().padStart(2, '0');
+                    const month = (dob.getMonth() + 1).toString().padStart(2, '0');
+                    const year = dob.getFullYear();
+                    
+                    $('#dob_day').val(day).trigger('change');
+                    $('#dob_month').val(month).trigger('change');
+                    $('#dob_year').val(year).trigger('change');
+                    
+                    // Update form for edit mode
+                    $('#form_method').val('PUT');
+                    $('#formTitle').text('Edit Family Member');
+                    $('#submitBtn').text('Update Member').removeClass('btn-success').addClass('btn-primary');
+                    $('#cancelEditBtn').show();
+                    
+                    // Scroll to form
+                    $('html, body').animate({
+                        scrollTop: $('#familyMemberForm').offset().top - 100
+                    }, 500);
+                },
+                error: function() {
                     Swal.fire({
                         icon: 'error',
                         title: 'Error!',
-                        text: 'Failed to delete family member. Please try again.'
+                        text: 'Failed to fetch member details.'
                     });
                 }
             });
-        }
-    });
-});
+        });
 
-// Open the Manage Events Modal
+        // Delete family member - using event delegation
+        $(document).on('click', '.delete-btn', function() {
+            const memberId = $(this).data('id');
+            const memberName = $(this).closest('tr').find('td:nth-child(2)').text();
+            
+            Swal.fire({
+                title: 'Are you sure?',
+                text: `You are about to delete ${memberName}. This action cannot be undone!`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, delete it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // If we're editing this member, reset the form first
+                    if ($('#member_id').val() == memberId) {
+                        resetForm();
+                    }
+                    
+                    // Properly construct the destroy URL with the id parameter
+                    const deleteUrl = '{{ route("admin.family.destroy", ["id" => ":id"]) }}'.replace(':id', memberId);
+                    
+                    $.ajax({
+                        url: deleteUrl,
+                        method: 'DELETE',
+                        data: {
+                            _token: '{{ csrf_token() }}',
+                            _method: 'DELETE'
+                        },
+                        success: function(response) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Deleted!',
+                                text: 'Family member has been deleted.',
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
+                            
+                            // Refresh DataTable
+                            dataTable.ajax.reload(null, false);
+                        },
+                        error: function(xhr) {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error!',
+                                text: 'Failed to delete family member. Please try again.'
+                            });
+                        }
+                    });
+                }
+            });
+        });
+
+        // Open the Manage Events Modal - using event delegation
         $(document).on('click', '.manage-events-btn', function() {
             const nodeId = $(this).data('id');
             const memberName = $(this).data('name');
@@ -762,92 +719,110 @@ $(document).on('click', '.delete-btn', function() {
             });
         });
 
-        // Open Relationship Modal
-    $(document).on('click', '.manage-relationships-btn', function() {
-        const nodeId = $(this).data('id');
-        const memberName = $(this).data('name');
+        // Open Relationship Modal - using event delegation
+        $(document).on('click', '.manage-relationships-btn', function() {
+            const nodeId = $(this).data('id');
+            const memberName = $(this).data('name');
 
-        $('#relationMemberName').text(memberName);
-        $('#relationNodeId').val(nodeId);
-        $('#addRelationshipForm')[0].reset();
-        $('#manageRelationshipsModal').modal('show');
+            $('#relationMemberName').text(memberName);
+            $('#relationNodeId').val(nodeId);
+            $('#addRelationshipForm')[0].reset();
+            
+            // Load family members for the dropdown
+            $.ajax({
+                url: '/admin/family/members/data',
+                method: 'GET',
+                data: { draw: 1, start: 0, length: 100 }, // Get first 100 members
+                success: function(response) {
+                    let options = '<option value="">Choose Member</option>';
+                    response.data.forEach(function(member) {
+                        // Don't include the current member in the list
+                        if (member.id != nodeId) {
+                            options += `<option value="${member.id}">${member.first_name} ${member.last_name}</option>`;
+                        }
+                    });
+                    $('#node2_id').html(options);
+                    
+                    // Now fetch existing relationships
+                    $.ajax({
+                        url: `/admin/family/${nodeId}/relationships`,
+                        method: 'GET',
+                        success: function(relationships) {
+                            let rows = '';
+                            relationships.forEach((relation, index) => {
+                                rows += `
+                                    <tr id="relation-row-${relation.id}">
+                                        <td>${index + 1}</td>
+                                        <td>${relation.related_member}</td>
+                                        <td>${relation.relationship_type}</td>
+                                        <td>
+                                            <button class="btn btn-danger btn-sm delete-relationship-btn" data-id="${relation.id}">Delete</button>
+                                        </td>
+                                    </tr>
+                                `;
+                            });
+                            $('#relationshipsTable tbody').html(rows);
+                            $('#manageRelationshipsModal').modal('show');
+                        }
+                    });
+                }
+            });
+        });
 
-        // Fetch Existing Relationships
-        $.ajax({
-            url: `/admin/family/${nodeId}/relationships`,
-            method: 'GET',
-            success: function(relationships) {
-                let rows = '';
-                relationships.forEach((relation, index) => {
-                    rows += `
-                        <tr id="relation-row-${relation.id}">
-                            <td>${index + 1}</td>
-                            <td>${relation.related_member}</td>
-                            <td>${relation.relationship_type}</td>
+        // Add Relationship
+        $('#addRelationshipForm').submit(function(e) {
+            e.preventDefault();
+
+            $.ajax({
+                url: '/admin/family/relationships',
+                method: 'POST',
+                data: $(this).serialize(),
+                success: function(response) {
+                    Swal.fire('Success!', 'Relationship added successfully.', 'success');
+
+                    const newRow = `
+                        <tr id="relation-row-${response.id}">
+                            <td>${$('#relationshipsTable tbody tr').length + 1}</td>
+                            <td>${response.related_member}</td>
+                            <td>${response.relationship_type}</td>
                             <td>
-                                <button class="btn btn-danger btn-sm delete-relationship-btn" data-id="${relation.id}">Delete</button>
+                                <button class="btn btn-danger btn-sm delete-relationship-btn" data-id="${response.id}">Delete</button>
                             </td>
                         </tr>
                     `;
-                });
-                $('#relationshipsTable tbody').html(rows);
-            }
+                    $('#relationshipsTable tbody').append(newRow);
+                    $('#addRelationshipForm')[0].reset();
+                },
+                error: function(xhr) {
+                    Swal.fire('Error!', 'Failed to add relationship.', 'error');
+                }
+            });
         });
-    });
 
-    // Add Relationship
-    $('#addRelationshipForm').submit(function(e) {
-        e.preventDefault();
+        // Delete Relationship
+        $(document).on('click', '.delete-relationship-btn', function() {
+            const relationId = $(this).data('id');
 
-        $.ajax({
-            url: '/admin/family/relationships',
-            method: 'POST',
-            data: $(this).serialize(),
-            success: function(response) {
-                Swal.fire('Success!', 'Relationship added successfully.', 'success');
-
-                const newRow = `
-                    <tr id="relation-row-${response.id}">
-                        <td>${$('#relationshipsTable tbody tr').length + 1}</td>
-                        <td>${response.related_member}</td>
-                        <td>${response.relationship_type}</td>
-                        <td>
-                            <button class="btn btn-danger btn-sm delete-relationship-btn" data-id="${response.id}">Delete</button>
-                        </td>
-                    </tr>
-                `;
-                $('#relationshipsTable tbody').append(newRow);
-                $('#addRelationshipForm')[0].reset();
-            },
-            error: function(xhr) {
-                Swal.fire('Error!', 'Failed to add relationship.', 'error');
-            }
+            $.ajax({
+                url: `/admin/family/relationships/${relationId}`,
+                method: 'DELETE',
+                data: { _token: '{{ csrf_token() }}' },
+                success: function() {
+                    Swal.fire('Deleted!', 'Relationship has been removed.', 'success');
+                    $(`#relation-row-${relationId}`).remove();
+                },
+                error: function() {
+                    Swal.fire('Error!', 'Failed to delete relationship.', 'error');
+                }
+            });
         });
-    });
-
-    // Delete Relationship
-    $(document).on('click', '.delete-relationship-btn', function() {
-        const relationId = $(this).data('id');
-
-        $.ajax({
-            url: `/admin/family/relationships/${relationId}`,
-            method: 'DELETE',
-            data: { _token: '{{ csrf_token() }}' },
-            success: function() {
-                Swal.fire('Deleted!', 'Relationship has been removed.', 'success');
-                $(`#relation-row-${relationId}`).remove();
-            },
-            error: function() {
-                Swal.fire('Error!', 'Failed to delete relationship.', 'error');
-            }
-        });
-    });
 
     });
 </script>
 @endsection
 
 @section('css')
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.25/css/dataTables.bootstrap4.min.css">
 <style>
     .is-invalid {
         border-color: #dc3545 !important;
@@ -865,6 +840,13 @@ $(document).on('click', '.delete-btn', function() {
         margin-top: 5px;
         font-weight: bold;
         color: #28a745;
+    }
+    table.dataTable {
+        width: 100% !important;
+        margin: 0 auto;
+        clear: both;
+        border-collapse: separate;
+        border-spacing: 0;
     }
 </style>
 @endsection

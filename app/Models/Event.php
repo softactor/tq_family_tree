@@ -13,12 +13,21 @@ class Event extends Model
         'node_id',
         'event_name',
         'event_date',
-        'description',
+        'description'
     ];
 
-    // Relation: Event belongs to a node
     public function node()
     {
         return $this->belongsTo(Node::class);
+    }
+
+    public function getFormattedDateAttribute()
+    {
+        return \Carbon\Carbon::parse($this->event_date)->format('M d, Y');
+    }
+
+    public function getEventTypeAttribute()
+    {
+        return ucfirst($this->event_name);
     }
 }

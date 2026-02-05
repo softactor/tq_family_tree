@@ -23,21 +23,28 @@ Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name
 
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
     Route::prefix('family')->name('family.')->group(function () {
-        Route::get('/members', [FamilyController::class, 'members'])->name('members');
-        Route::get('/add', [FamilyController::class, 'add'])->name('add');
-        Route::post('/store', [FamilyController::class, 'store'])->name('store');
-        Route::get('/{id}', [FamilyController::class, 'show'])->name('show'); // To fetch details for editing
-        Route::put('/{id}', [FamilyController::class, 'update'])->name('update'); // Fixed parameter "{id}" here
-        Route::delete('/{id}', [FamilyController::class, 'destroy'])->name('destroy');
+        // Family Member CRUD Routes
+        Route::get('/members', [FamilyController::class, 'members'])->name('members'); // List all members
+        Route::post('/store', [FamilyController::class, 'store'])->name('store'); // Add new member
+        Route::get('/{id}', [FamilyController::class, 'show'])->name('show'); // Fetch details for editing
+        Route::put('/{id}', [FamilyController::class, 'update'])->name('update'); // Update existing member
+        Route::delete('/{id}', [FamilyController::class, 'destroy'])->name('destroy'); // Delete a member
+        
+        // Fetch family members data (e.g., for AJAX tables)
+        Route::get('/members/data', [FamilyController::class, 'getMembers'])->name('members.data');
 
-        Route::get('/{id}/events', [FamilyController::class, 'fetchEvents'])->name('events.fetch');
-        Route::post('/events', [FamilyController::class, 'storeEvent'])->name('events.store');
-        Route::delete('/events/{id}', [FamilyController::class, 'deleteEvent'])->name('events.delete');
+        // Event Management Routes
+        Route::get('/{id}/events', [FamilyController::class, 'fetchEvents'])->name('events.fetch'); // Fetch all events for member
+        Route::post('/{id}/events', [FamilyController::class, 'storeEvent'])->name('events.store'); // Add event for member
+        Route::delete('/events/{id}', [FamilyController::class, 'deleteEvent'])->name('events.delete'); // Delete specific event
 
+        // Relationship Management Routes
+        Route::get('/{id}/relationships', [FamilyController::class, 'fetchRelationships'])->name('relationships.fetch'); // Fetch all relationships of member
+        Route::post('/{id}/relationships', [FamilyController::class, 'storeRelationship'])->name('relationships.store'); // Add a relationship for member
+        Route::delete('/relationships/{id}', [FamilyController::class, 'deleteRelationship'])->name('relationships.delete'); // Delete a specific relationship
 
-        Route::get('/{id}/relationships', [FamilyController::class, 'fetchRelationships'])->name('relationships.fetch');
-        Route::post('/relationships', [FamilyController::class, 'storeRelationship'])->name('relationships.store');
-        Route::delete('/relationships/{id}', [FamilyController::class, 'deleteRelationship'])->name('relationships.delete');
-
+        // Family Tree Route
+        Route::get('/tree/vizualization', [FamilyController::class, 'fetchFamilyTree'])->name('tree.fetch'); // Fetch tree data
+        Route::get('/tree/visualization', [FamilyController::class, 'treeVisualization'])->name('tree.visualization');
     });
 });

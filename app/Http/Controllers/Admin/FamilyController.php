@@ -7,24 +7,115 @@ use App\Models\Event;
 use App\Models\Node;
 use App\Models\Relationship;
 use Illuminate\Http\Request;
+use Yajra\DataTables\Facades\DataTables;
 
 class FamilyController extends Controller
 {
     /**
-     * Show all family members.
+     * Show all family members page.
      *
      * @return \Illuminate\Contracts\Support\Renderable
      */
     public function members()
     {
-        $familyMembers = Node::all(); // Get all nodes (family members)
-        return view('admin.family.members', compact('familyMembers'));
+        return view('admin.family.members');
+    }
+
+    /**
+     * Get family members for DataTables (server-side).
+     */
+    public function getMembers(Request $request)
+    {
+        if ($request->ajax()) {
+            $query = Node::query();
+
+            // Get DataTables parameters
+            $orderColumnIndex = $request->get('order')[0]['column'] ?? 3; // Default to DOB column (index 3)
+            $orderDirection = $request->get('order')[0]['dir'] ?? 'asc';
+
+            // Map DataTables columns to database columns
+            $columnMap = [
+                0 => 'id', // DT_RowIndex
+                1 => 'first_name',
+                2 => 'gender',
+                3 => 'dob', // This is the DOB column
+                4 => 'dob', // Age also uses dob
+                5 => 'id', // Actions column
+            ];
+
+            $orderColumn = $columnMap[$orderColumnIndex] ?? 'dob';
+
+            // Special handling for DOB column to put NULLs last
+            if ($orderColumn == 'dob') {
+                if ($orderDirection == 'asc') {
+                    $query->orderByRaw('dob IS NULL, dob ASC');
+                } else {
+                    $query->orderByRaw('dob IS NOT NULL, dob DESC');
+                }
+            } else {
+                // For other columns, normal sorting
+                $query->orderBy($orderColumn, $orderDirection);
+            }
+
+            return DataTables::eloquent($query)
+                ->addIndexColumn()
+                ->addColumn('full_name', function ($row) {
+                    return $row->first_name . ' ' . $row->last_name;
+                })
+                ->addColumn('dob_formatted', function ($row) {
+                    if (!$row->dob) {
+                        return 'N/A';
+                    }
+                    return \Carbon\Carbon::parse($row->dob)->format('M d, Y');
+                })
+                ->addColumn('age', function ($row) {
+                    if (!$row->dob) {
+                        return 'N/A';
+                    }
+                    return \Carbon\Carbon::parse($row->dob)->age . ' years';
+                })
+                ->addColumn('gender_formatted', function ($row) {
+                    return ucfirst($row->gender);
+                })
+                ->addColumn('actions', function ($row) {
+                    return '
+                        <button class="btn btn-info btn-sm manage-relationships-btn" 
+                                data-id="' . $row->id . '" 
+                                data-name="' . $row->first_name . ' ' . $row->last_name . '">
+                            Manage Relationships
+                        </button>
+                        <button class="btn btn-info btn-sm manage-events-btn" 
+                                data-id="' . $row->id . '" 
+                                data-name="' . $row->first_name . ' ' . $row->last_name . '">
+                            Manage Events
+                        </button>
+                        <button class="btn btn-warning btn-sm edit-btn" data-id="' . $row->id . '">Edit</button>
+                        <button class="btn btn-danger btn-sm delete-btn" data-id="' . $row->id . '">Delete</button>
+                    ';
+                })
+                ->rawColumns(['actions'])
+                ->filter(function ($query) use ($request) {
+                    if (!empty($request->get('search')['value'])) {
+                        $search = $request->get('search')['value'];
+                        $query->where(function ($q) use ($search) {
+                            $q->where('first_name', 'LIKE', "%{$search}%")
+                                ->orWhere('last_name', 'LIKE', "%{$search}%")
+                                ->orWhere('gender', 'LIKE', "%{$search}%")
+                                ->orWhere('dob', 'LIKE', "%{$search}%");
+                        });
+                    }
+                })
+                ->setRowId(function ($row) {
+                    return 'member-row-' . $row->id;
+                })
+                ->make(true);
+        }
+
+        return abort(404);
     }
 
     /**
      * Show add family member form.
-     *
-     * @return \Illuminate\Contracts\Support\Renderable
      */
     public function add()
     {
@@ -33,11 +124,7 @@ class FamilyController extends Controller
 
     /**
      * Store a new family member.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\RedirectResponse
      */
-
     public function store(Request $request)
     {
         // Validate the request
@@ -57,9 +144,6 @@ class FamilyController extends Controller
 
     /**
      * Show the specified family member.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\JsonResponse
      */
     public function show($id)
     {
@@ -69,10 +153,6 @@ class FamilyController extends Controller
 
     /**
      * Update the specified family member.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\JsonResponse
      */
     public function update(Request $request, $id)
     {
@@ -94,9 +174,6 @@ class FamilyController extends Controller
 
     /**
      * Remove the specified family member.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\JsonResponse
      */
     public function destroy($id)
     {
@@ -106,12 +183,18 @@ class FamilyController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Fetch events for a specific family member.
+     */
     public function fetchEvents($id)
     {
         $events = Event::where('node_id', $id)->get();
         return response()->json($events);
     }
 
+    /**
+     * Store a new event.
+     */
     public function storeEvent(Request $request)
     {
         $validated = $request->validate([
@@ -125,6 +208,9 @@ class FamilyController extends Controller
         return response()->json($event);
     }
 
+    /**
+     * Delete an event.
+     */
     public function deleteEvent($id)
     {
         $event = Event::findOrFail($id);
@@ -132,6 +218,9 @@ class FamilyController extends Controller
         return response()->json(['message' => 'Event deleted successfully!']);
     }
 
+    /**
+     * Fetch relationships for a specific family member.
+     */
     public function fetchRelationships($id)
     {
         $relationships = Relationship::where('node1_id', $id)
@@ -153,11 +242,14 @@ class FamilyController extends Controller
         return response()->json($relationships);
     }
 
+    /**
+     * Store a new relationship.
+     */
     public function storeRelationship(Request $request)
     {
         $validated = $request->validate([
             'node1_id' => 'required|exists:nodes,id',
-            'node2_id' => 'required|exists:nodes,id|different:node1_id', // Cannot relate with oneself
+            'node2_id' => 'required|exists:nodes,id|different:node1_id',
             'relationship_type' => 'required|in:parent,child,spouse,sibling',
         ]);
 
@@ -172,11 +264,177 @@ class FamilyController extends Controller
         ]);
     }
 
+    /**
+     * Delete a relationship.
+     */
     public function deleteRelationship($id)
     {
         $relationship = Relationship::findOrFail($id);
         $relationship->delete();
 
         return response()->json(['message' => 'Relationship deleted successfully!']);
+    }
+
+    /**
+     * Recursively build family tree.
+     */
+    private function buildTree($node)
+    {
+        // Get children nodes directly (not through relationships)
+        $children = $node->children()->get();
+
+        $childNodes = $children->map(function ($child) {
+            return $this->buildTree($child);
+        });
+
+        return [
+            'id' => $node->id,
+            'name' => trim($node->first_name . ' ' . $node->last_name),
+            'gender' => $node->gender,
+            'dob' => $node->dob,
+            'children' => $childNodes->toArray(),
+        ];
+    }
+
+    /**
+     * Alternative tree building method using eager loading for better performance.
+     */
+    public function fetchFamilyTree()
+    {
+        // Eager load all nodes with their children recursively
+        $nodes = Node::with(['children' => function ($query) {
+            $query->with(['children' => function ($query) {
+                $query->with('children'); // 3 levels deep
+            }]);
+        }])->get();
+
+        // Find root nodes (nodes without parents)
+        $rootNodes = $nodes->filter(function ($node) use ($nodes) {
+            // A node is a root if no other node has it as a child
+            return !$nodes->contains(function ($n) use ($node) {
+                return $n->children->contains('id', $node->id);
+            });
+        });
+
+        if ($rootNodes->isEmpty()) {
+            return response()->json(['error' => 'No root nodes found'], 404);
+        }
+
+        // Build tree from the first root node
+        $tree = $this->formatTree($rootNodes->first());
+
+        return response()->json($tree);
+    }
+
+    /**
+     * Format tree for JSON response.
+     */
+    private function formatTree($node)
+    {
+        if (!$node) {
+            return null;
+        }
+
+        $children = $node->children->map(function ($child) {
+            return $this->formatTree($child);
+        });
+
+        return [
+            'id' => $node->id,
+            'name' => trim($node->first_name . ' ' . $node->last_name),
+            'gender' => $node->gender,
+            'dob' => $node->dob,
+            'children' => $children->toArray(),
+        ];
+    }
+
+
+
+
+
+
+
+
+    public function treeVisualization()
+    {
+        // Find root nodes (nodes without parents)
+        $rootNodes = Node::whereDoesntHave('parents')
+            ->with(['children' => function ($query) {
+                $query->with(['children' => function ($query) {
+                    $query->with(['children' => function ($query) {
+                        $query->with(['allEvents', 'children']);
+                    }, 'allEvents']);
+                }, 'allEvents']);
+            }, 'allEvents'])
+            ->get();
+
+        if ($rootNodes->isEmpty()) {
+            // If no root nodes found, use the oldest person as root
+            $rootNode = Node::whereNotNull('dob')
+                ->with(['children' => function ($query) {
+                    $query->with(['children' => function ($query) {
+                        $query->with(['children' => function ($query) {
+                            $query->with(['allEvents', 'children']);
+                        }, 'allEvents']);
+                    }, 'allEvents']);
+                }, 'allEvents'])
+                ->orderBy('dob', 'asc')
+                ->first();
+
+            if (!$rootNode) {
+                $rootNode = Node::with(['children' => function ($query) {
+                    $query->with(['children' => function ($query) {
+                        $query->with(['children' => function ($query) {
+                            $query->with(['allEvents', 'children']);
+                        }, 'allEvents']);
+                    }, 'allEvents']);
+                }, 'allEvents'])->first();
+            }
+
+            if (!$rootNode) {
+                return abort(404, "No family members found.");
+            }
+
+            $tree = $this->buildTreeWithEvents($rootNode);
+        } else {
+            // Build tree for the first root node
+            $tree = $this->buildTreeWithEvents($rootNodes->first());
+        }
+
+        return view('admin.family.tree')->with('treeData', $tree);
+    }
+
+    /**
+     * Recursively build family tree with events.
+     */
+    private function buildTreeWithEvents($node)
+    {
+        // Get children nodes
+        $children = $node->children()->with('allEvents')->get();
+
+        $childNodes = $children->map(function ($child) {
+            return $this->buildTreeWithEvents($child);
+        });
+
+        // Get events for this node
+        $events = $node->allEvents->map(function ($event) {
+            return [
+                'id' => $event->id,
+                'name' => $event->event_name,
+                'date' => $event->event_date,
+                'formatted_date' => \Carbon\Carbon::parse($event->event_date)->format('M d, Y'),
+                'description' => $event->description,
+            ];
+        });
+
+        return [
+            'id' => $node->id,
+            'name' => trim($node->first_name . ' ' . $node->last_name),
+            'gender' => $node->gender,
+            'dob' => $node->dob,
+            'formatted_dob' => $node->dob ? \Carbon\Carbon::parse($node->dob)->format('M d, Y') : 'N/A',
+            'events' => $events->toArray(),
+            'children' => $childNodes->toArray(),
+        ];
     }
 }
