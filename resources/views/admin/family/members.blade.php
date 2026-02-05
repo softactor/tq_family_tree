@@ -817,6 +817,27 @@ var dataTable = $('#familyMembersTable').DataTable({
             });
         });
 
+
+        // View Family Tree for specific member
+$(document).on('click', '.view-tree-btn', function() {
+    const memberId = $(this).data('id');
+    const memberName = $(this).data('name');
+    
+    // Show loading
+    Swal.fire({
+        title: 'Loading...',
+        text: 'Generating family tree for ' + memberName,
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    // Redirect to the member tree page
+    const treeUrl = '{{ route("admin.family.member.tree", ["id" => ":id"]) }}'.replace(':id', memberId);
+    window.location.href = treeUrl;
+});
+
     });
 </script>
 @endsection

@@ -25,94 +25,112 @@ class FamilyController extends Controller
      * Get family members for DataTables (server-side).
      */
     public function getMembers(Request $request)
-    {
-        if ($request->ajax()) {
-            $query = Node::query();
+{
+    if ($request->ajax()) {
+        $query = Node::query();
 
-            // Get DataTables parameters
-            $orderColumnIndex = $request->get('order')[0]['column'] ?? 3; // Default to DOB column (index 3)
-            $orderDirection = $request->get('order')[0]['dir'] ?? 'asc';
+        // Get DataTables parameters
+        $orderColumnIndex = $request->get('order')[0]['column'] ?? 3; // Default to DOB column (index 3)
+        $orderDirection = $request->get('order')[0]['dir'] ?? 'asc';
 
-            // Map DataTables columns to database columns
-            $columnMap = [
-                0 => 'id', // DT_RowIndex
-                1 => 'first_name',
-                2 => 'gender',
-                3 => 'dob', // This is the DOB column
-                4 => 'dob', // Age also uses dob
-                5 => 'id', // Actions column
-            ];
+        // Map DataTables columns to database columns
+        $columnMap = [
+            0 => 'id', // DT_RowIndex
+            1 => 'first_name',
+            2 => 'gender',
+            3 => 'dob', // This is the DOB column
+            4 => 'dob', // Age also uses dob
+            5 => 'id', // Actions column
+        ];
 
-            $orderColumn = $columnMap[$orderColumnIndex] ?? 'dob';
+        $orderColumn = $columnMap[$orderColumnIndex] ?? 'dob';
 
-            // Special handling for DOB column to put NULLs last
-            if ($orderColumn == 'dob') {
-                if ($orderDirection == 'asc') {
-                    $query->orderByRaw('dob IS NULL, dob ASC');
-                } else {
-                    $query->orderByRaw('dob IS NOT NULL, dob DESC');
-                }
+        // Special handling for DOB column to put NULLs last
+        if ($orderColumn == 'dob') {
+            if ($orderDirection == 'asc') {
+                $query->orderByRaw('dob IS NULL, dob ASC');
             } else {
-                // For other columns, normal sorting
-                $query->orderBy($orderColumn, $orderDirection);
+                $query->orderByRaw('dob IS NOT NULL, dob DESC');
             }
-
-            return DataTables::eloquent($query)
-                ->addIndexColumn()
-                ->addColumn('full_name', function ($row) {
-                    return $row->first_name . ' ' . $row->last_name;
-                })
-                ->addColumn('dob_formatted', function ($row) {
-                    if (!$row->dob) {
-                        return 'N/A';
-                    }
-                    return \Carbon\Carbon::parse($row->dob)->format('M d, Y');
-                })
-                ->addColumn('age', function ($row) {
-                    if (!$row->dob) {
-                        return 'N/A';
-                    }
-                    return \Carbon\Carbon::parse($row->dob)->age . ' years';
-                })
-                ->addColumn('gender_formatted', function ($row) {
-                    return ucfirst($row->gender);
-                })
-                ->addColumn('actions', function ($row) {
-                    return '
-                        <button class="btn btn-info btn-sm manage-relationships-btn" 
-                                data-id="' . $row->id . '" 
-                                data-name="' . $row->first_name . ' ' . $row->last_name . '">
-                            Manage Relationships
-                        </button>
-                        <button class="btn btn-info btn-sm manage-events-btn" 
-                                data-id="' . $row->id . '" 
-                                data-name="' . $row->first_name . ' ' . $row->last_name . '">
-                            Manage Events
-                        </button>
-                        <button class="btn btn-warning btn-sm edit-btn" data-id="' . $row->id . '">Edit</button>
-                        <button class="btn btn-danger btn-sm delete-btn" data-id="' . $row->id . '">Delete</button>
-                    ';
-                })
-                ->rawColumns(['actions'])
-                ->filter(function ($query) use ($request) {
-                    if (!empty($request->get('search')['value'])) {
-                        $search = $request->get('search')['value'];
-                        $query->where(function ($q) use ($search) {
-                            $q->where('first_name', 'LIKE', "%{$search}%")
-                                ->orWhere('last_name', 'LIKE', "%{$search}%")
-                                ->orWhere('gender', 'LIKE', "%{$search}%")
-                                ->orWhere('dob', 'LIKE', "%{$search}%");
-                        });
-                    }
-                })
-                ->setRowId(function ($row) {
-                    return 'member-row-' . $row->id;
-                })
-                ->make(true);
+        } else {
+            // For other columns, normal sorting
+            $query->orderBy($orderColumn, $orderDirection);
         }
 
-        return abort(404);
+        return DataTables::eloquent($query)
+            ->addIndexColumn()
+            ->addColumn('full_name', function ($row) {
+                return $row->first_name . ' ' . $row->last_name;
+            })
+            ->addColumn('dob_formatted', function ($row) {
+                if (!$row->dob) {
+                    return 'N/A';
+                }
+                return \Carbon\Carbon::parse($row->dob)->format('M d, Y');
+            })
+            ->addColumn('age', function ($row) {
+                if (!$row->dob) {
+                    return 'N/A';
+                }
+                return \Carbon\Carbon::parse($row->dob)->age . ' years';
+            })
+            ->addColumn('gender_formatted', function ($row) {
+                return ucfirst($row->gender);
+            })
+            ->addColumn('actions', function($row) {
+                return '
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-primary btn-sm view-tree-btn" 
+                                data-id="'.$row->id.'" 
+                                data-name="'.$row->first_name.' '.$row->last_name.'"
+                                title="View Family Tree">
+                            <i class="fas fa-project-diagram"></i>
+                        </button>
+                        <button class="btn btn-info btn-sm manage-relationships-btn" 
+                                data-id="'.$row->id.'" 
+                                data-name="'.$row->first_name.' '.$row->last_name.'"
+                                title="Manage Relationships">
+                            <i class="fas fa-users"></i>
+                        </button>
+                        <button class="btn btn-info btn-sm manage-events-btn" 
+                                data-id="'.$row->id.'" 
+                                data-name="'.$row->first_name.' '.$row->last_name.'"
+                                title="Manage Events">
+                            <i class="fas fa-calendar-alt"></i>
+                        </button>
+                        <button class="btn btn-warning btn-sm edit-btn" 
+                                data-id="'.$row->id.'"
+                                title="Edit Member">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-danger btn-sm delete-btn" 
+                                data-id="'.$row->id.'"
+                                title="Delete Member">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                ';
+            })
+            ->rawColumns(['actions'])
+            ->filter(function ($query) use ($request) {
+                if (!empty($request->get('search')['value'])) {
+                    $search = $request->get('search')['value'];
+                    $query->where(function ($q) use ($search) {
+                        $q->where('first_name', 'LIKE', "%{$search}%")
+                            ->orWhere('last_name', 'LIKE', "%{$search}%")
+                            ->orWhere('gender', 'LIKE', "%{$search}%")
+                            ->orWhere('dob', 'LIKE', "%{$search}%");
+                    });
+                }
+            })
+            ->setRowId(function ($row) {
+                return 'member-row-' . $row->id;
+            })
+            ->make(true);
     }
+
+    return abort(404);
+}
 
     /**
      * Show add family member form.
@@ -435,6 +453,169 @@ class FamilyController extends Controller
             'formatted_dob' => $node->dob ? \Carbon\Carbon::parse($node->dob)->format('M d, Y') : 'N/A',
             'events' => $events->toArray(),
             'children' => $childNodes->toArray(),
+        ];
+    }
+
+
+
+
+
+
+
+    /**
+     * Show family tree for a specific member.
+     *
+     * @param  int  $id
+     * @return \Illuminate\Contracts\Support\Renderable
+     */
+    public function viewMemberTree($id)
+    {
+        $member = Node::with([
+            'allEvents',
+            'children' => function ($query) {
+                $query->with([
+                    'allEvents',
+                    'children' => function ($query) {
+                        $query->with([
+                            'allEvents',
+                            'children' => function ($query) {
+                                $query->with(['allEvents', 'children']);
+                            }
+                        ]);
+                    }
+                ]);
+            }
+        ])->findOrFail($id);
+
+        // Also get parents to show upward relationships
+        $parents = $member->parents()->with('allEvents')->get();
+        $spouse = $member->spouse()->with('allEvents')->first();
+
+        // Build the tree with the member as the root
+        $tree = $this->buildMemberTree($member, $parents, $spouse);
+
+        return view('admin.family.member-tree')
+            ->with('treeData', $tree)
+            ->with('memberName', $member->first_name . ' ' . $member->last_name);
+    }
+
+    /**
+     * Build tree for a specific member.
+     */
+    private function buildMemberTree($member, $parents, $spouse)
+    {
+        // Get children nodes
+        $children = $member->children()->with('allEvents')->get();
+
+        $childNodes = $children->map(function ($child) {
+            $grandChildren = $child->children()->with('allEvents')->get();
+
+            $grandChildNodes = $grandChildren->map(function ($grandChild) {
+                return [
+                    'id' => $grandChild->id,
+                    'name' => trim($grandChild->first_name . ' ' . $grandChild->last_name),
+                    'gender' => $grandChild->gender,
+                    'dob' => $grandChild->dob,
+                    'formatted_dob' => $grandChild->dob ? \Carbon\Carbon::parse($grandChild->dob)->format('M d, Y') : 'N/A',
+                    'events' => $grandChild->allEvents->map(function ($event) {
+                        return [
+                            'id' => $event->id,
+                            'name' => $event->event_name,
+                            'date' => $event->event_date,
+                            'formatted_date' => \Carbon\Carbon::parse($event->event_date)->format('M d, Y'),
+                            'description' => $event->description,
+                        ];
+                    })->toArray(),
+                    'children' => [],
+                ];
+            });
+
+            return [
+                'id' => $child->id,
+                'name' => trim($child->first_name . ' ' . $child->last_name),
+                'gender' => $child->gender,
+                'dob' => $child->dob,
+                'formatted_dob' => $child->dob ? \Carbon\Carbon::parse($child->dob)->format('M d, Y') : 'N/A',
+                'events' => $child->allEvents->map(function ($event) {
+                    return [
+                        'id' => $event->id,
+                        'name' => $event->event_name,
+                        'date' => $event->event_date,
+                        'formatted_date' => \Carbon\Carbon::parse($event->event_date)->format('M d, Y'),
+                        'description' => $event->description,
+                    ];
+                })->toArray(),
+                'children' => $grandChildNodes->toArray(),
+            ];
+        });
+
+        // Get events for the main member
+        $events = $member->allEvents->map(function ($event) {
+            return [
+                'id' => $event->id,
+                'name' => $event->event_name,
+                'date' => $event->event_date,
+                'formatted_date' => \Carbon\Carbon::parse($event->event_date)->format('M d, Y'),
+                'description' => $event->description,
+            ];
+        });
+
+        // Prepare parent nodes
+        $parentNodes = $parents->map(function ($parent) {
+            return [
+                'id' => $parent->id,
+                'name' => trim($parent->first_name . ' ' . $parent->last_name),
+                'gender' => $parent->gender,
+                'dob' => $parent->dob,
+                'formatted_dob' => $parent->dob ? \Carbon\Carbon::parse($parent->dob)->format('M d, Y') : 'N/A',
+                'events' => $parent->allEvents->map(function ($event) {
+                    return [
+                        'id' => $event->id,
+                        'name' => $event->event_name,
+                        'date' => $event->event_date,
+                        'formatted_date' => \Carbon\Carbon::parse($event->event_date)->format('M d, Y'),
+                        'description' => $event->description,
+                    ];
+                })->toArray(),
+                'children' => [],
+            ];
+        });
+
+        // Prepare spouse node if exists
+        $spouseNode = null;
+        if ($spouse) {
+            $spouseNode = [
+                'id' => $spouse->id,
+                'name' => trim($spouse->first_name . ' ' . $spouse->last_name),
+                'gender' => $spouse->gender,
+                'dob' => $spouse->dob,
+                'formatted_dob' => $spouse->dob ? \Carbon\Carbon::parse($spouse->dob)->format('M d, Y') : 'N/A',
+                'events' => $spouse->allEvents->map(function ($event) {
+                    return [
+                        'id' => $event->id,
+                        'name' => $event->event_name,
+                        'date' => $event->event_date,
+                        'formatted_date' => \Carbon\Carbon::parse($event->event_date)->format('M d, Y'),
+                        'description' => $event->description,
+                    ];
+                })->toArray(),
+                'children' => [],
+                'isSpouse' => true,
+            ];
+        }
+
+        return [
+            'member' => [
+                'id' => $member->id,
+                'name' => trim($member->first_name . ' ' . $member->last_name),
+                'gender' => $member->gender,
+                'dob' => $member->dob,
+                'formatted_dob' => $member->dob ? \Carbon\Carbon::parse($member->dob)->format('M d, Y') : 'N/A',
+                'events' => $events->toArray(),
+                'children' => $childNodes->toArray(),
+            ],
+            'parents' => $parentNodes->toArray(),
+            'spouse' => $spouseNode,
         ];
     }
 }

@@ -46,5 +46,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         // Family Tree Route
         Route::get('/tree/vizualization', [FamilyController::class, 'fetchFamilyTree'])->name('tree.fetch'); // Fetch tree data
         Route::get('/tree/visualization', [FamilyController::class, 'treeVisualization'])->name('tree.visualization');
+        // Add this route to your existing family routes
+        Route::get('/{id}/tree', [FamilyController::class, 'viewMemberTree'])->name('member.tree');
     });
 });
