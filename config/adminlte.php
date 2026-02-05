@@ -63,7 +63,7 @@ return [
     |
     */
 
-    'logo' => '<b>Admin</b>LTE',
+    'logo' => '<b>Family</b>Tree',
     'logo_img' => 'vendor/adminlte/dist/img/AdminLTELogo.png',
     'logo_img_class' => 'brand-image img-circle elevation-3',
     'logo_img_xl' => null,
@@ -250,7 +250,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'use_route_url' => false,
-    'dashboard_url' => 'admin/dashboard', // Important: Changed from 'home' to 'admin/dashboard'
+    'dashboard_url' => '#', // Important: Changed from 'home' to 'admin/dashboard'
     'logout_url' => 'logout',
     'logout_method' => 'POST', // This is correct
     'login_url' => 'login',
@@ -269,7 +269,7 @@ return [
         // Admin Dashboard header
         [
             'text' => 'Dashboard',
-            'url'  => 'admin/dashboard',
+            'url'  => 'admin/family/members',
             'icon' => 'fas fa-tachometer-alt',
         ],
 
