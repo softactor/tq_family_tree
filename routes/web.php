@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     if (Auth::check()) {
         // If user is logged in, redirect to dashboard
-        return redirect()->route('admin.dashboard');
+        return redirect()->route('admin.family.members');
     }
     // If not logged in, redirect to login
     return redirect()->route('login');

@@ -286,27 +286,7 @@ return [
                     'url'  => 'admin/family/members',
                     'icon' => 'fas fa-users',
                 ],
-                [
-                    'text' => 'Add New Member',
-                    'url'  => 'admin/family/add',
-                    'icon' => 'fas fa-user-plus',
-                ],
             ],
-        ],
-
-        // Plain Menu Item
-        [
-            'text' => 'Events',
-            'url'  => 'admin/events',
-            'icon' => 'fas fa-calendar',
-        ],
-
-        // Admin Tools Section
-        ['header' => 'TOOLS'],
-        [
-            'text' => 'Settings',
-            'url'  => 'admin/settings',
-            'icon' => 'fas fa-cogs',
         ],
 
         // REMOVE THE LOGOUT MENU ITEM FROM HERE
